@@ -1,0 +1,78 @@
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+#include <Servo.h>
+
+// ----- ПИНЫ -----
+#define TRIG_PIN 9
+#define ECHO_PIN 10
+#define SERVO_PIN 6
+
+// ----- УСТРОЙСТВА -----
+LiquidCrystal_I2C lcd(0x20, 16, 2); // если не работает — попробуй 0x20
+Servo gate;
+
+// ----- ПЕРЕМЕННЫЕ -----
+long duration;
+float distance;
+
+void setup() {
+  pinMode(TRIG_PIN, OUTPUT);
+  pinMode(ECHO_PIN, INPUT);
+
+  gate.attach(SERVO_PIN);
+  gate.write(0); // шлагбаум закрыт
+
+  lcd.init();
+  lcd.backlight();
+
+  lcd.setCursor(0, 0);
+  lcd.print("Parking system");
+  lcd.setCursor(0, 1);
+  lcd.print("Initializing");
+  delay(2000);
+  lcd.clear();
+}
+
+void loop() {
+  // ---- ИЗМЕРЕНИЕ РАССТОЯНИЯ ----
+  digitalWrite(TRIG_PIN, LOW);
+  delayMicroseconds(2);
+  digitalWrite(TRIG_PIN, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(TRIG_PIN, LOW);
+
+  duration = pulseIn(ECHO_PIN, HIGH, 30000);
+  distance = duration * 0.034 / 2;
+
+  if (distance < 0.1 || distance > 40 || duration == 0) {
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("SENSOR ERROR");
+    lcd.setCursor(0, 1);
+    lcd.print("Out of range");
+
+    gate.write(0); // безопасность
+    delay(500);
+    return; // пропускаем остальную логику
+  }
+
+  // ---- ОСНОВНАЯ ЛОГИКА ----
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Distance:");
+  lcd.setCursor(10, 0);
+  lcd.print(distance, 1); // 1 знак после запятой
+  lcd.print("cm");
+
+  lcd.setCursor(0, 1);
+
+  if (distance < 8) {
+    lcd.print("Status: BUSY ");
+    gate.write(90); // открыть
+  } else {
+    lcd.print("Status: FREE ");
+    gate.write(0);  // закрыть
+  }
+
+  delay(500);
+}
